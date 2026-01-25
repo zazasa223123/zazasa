@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Монитор Света v5</title>
+    <title>Монитор Света: Shared Edition</title>
     <style>
         body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
         .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); }
@@ -14,28 +14,32 @@
 
         .timeline-container { position: relative; height: 25px; background: #222; border-radius: 8px; margin: 10px 0 25px 0; overflow: hidden; border: 1px solid #333; }
         .timeline-segment { position: absolute; height: 100%; top: 0; }
+        .past { opacity: 0.3 !important; }
         #now-marker { position: absolute; width: 3px; height: 100%; background: #fff; top: 0; z-index: 10; box-shadow: 0 0 10px #fff; }
 
         .timer-block { margin: 10px 0; padding: 10px; border-radius: 12px; background: #181818; border: 1px solid #222; display: none; }
         .digits { font-size: 2.5rem; font-family: monospace; display: block; font-weight: bold; }
         .label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.5; display: block; }
 
-        .stats-section { background: #1a1a1a; border-radius: 15px; padding: 15px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-item { font-size: 0.8rem; color: #888; }
-        .stat-value { display: block; font-size: 1.1rem; color: #00ff88; font-weight: bold; }
+        .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-item { font-size: 0.75rem; color: #888; }
+        .stat-value { display: block; font-size: 1rem; color: #00ff88; font-weight: bold; }
 
-        textarea { width: 100%; background: #151515; color: #666; border: 1px solid #222; padding: 10px; border-radius: 10px; margin-top: 20px; font-size: 0.7rem; resize: none; box-sizing: border-box; }
-        button { background: #0055ff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        textarea { width: 100%; background: #151515; color: #666; border: 1px solid #222; padding: 10px; border-radius: 10px; margin-top: 15px; font-size: 0.7rem; resize: none; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { flex: 1; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-main { background: #0055ff; color: #fff; }
+        .btn-share { background: #222; color: #00ff88; border: 1px solid #333; }
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <div id="main-status">Введите график</div>
+    <div id="main-status">Загрузка...</div>
 
-    <div class="timeline-container" id="timeline">
-        <div id="now-marker"></div>
-    </div>
+    <div class="timeline-container" id="timeline"><div id="now-marker"></div></div>
 
     <div id="block-off" class="timer-block" style="color: #00ff88;">
         <span class="label">Свет будет еще:</span>
@@ -48,35 +52,60 @@
     </div>
 
     <div class="stats-section">
-        <div class="stat-item">Свет за сутки:<span id="stat-total" class="stat-value">--</span></div>
+        <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
         <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
-        <div class="stat-item">Прогресс дня:<span id="stat-used" class="stat-value">--</span></div>
-        <div class="stat-item">Осталось сеансов:<span id="stat-count" class="stat-value">--</span></div>
+        <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
+        <div class="stat-item">Осталось:<span id="stat-count" class="stat-value">--</span></div>
     </div>
 
-    <textarea id="input" rows="2" placeholder="00:00-04:00, 08:00-12:00"></textarea>
-    <button onclick="init()">⚡ ЗАПУСТИТЬ</button>
+    <textarea id="input" rows="2" placeholder="Вставьте текст с графиком..."></textarea>
+    
+    <div class="btn-group">
+        <button class="btn-main" onclick="init()">⚡ ЗАПУСТИТЬ</button>
+        <button class="btn-share" onclick="share()">🔗 ПОДЕЛИТЬСЯ</button>
+    </div>
 </div>
 
 <script>
     let schedule = [];
     let isRunning = false;
 
+    // 1. ПРОВЕРКА ССЫЛКИ ПРИ ЗАГРУЗКЕ
+    window.onload = () => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedData = params.get('sch');
+        
+        if (sharedData) {
+            const decoded = atob(sharedData); // Декодируем из Base64
+            document.getElementById('input').value = decoded;
+            init();
+            // Чистим URL, чтобы не смущать пользователя
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            const saved = localStorage.getItem('v6_saved');
+            if (saved) { document.getElementById('input').value = saved; init(); }
+        }
+    };
+
     function init() {
         const val = document.getElementById('input').value;
         if (!val.trim()) return;
-        
-        localStorage.setItem('saved_gr_v5', val);
+        localStorage.setItem('v6_saved', val);
         parse(val);
         drawTimeline();
-        
-        const now = new Date();
-        const cur = now.getHours() * 60 + now.getMinutes();
-        
-        // ВАЖНО: Рассчитываем всё сразу при клике
-        updateStats(cur); 
-        isRunning = true;
         update(); 
+        isRunning = true;
+    }
+
+    function share() {
+        const val = document.getElementById('input').value;
+        if (!val) return alert("Сначала введите график!");
+        const encoded = btoa(val); // Кодируем в Base64 для ссылки
+        const url = window.location.origin + window.location.pathname + '?sch=' + encoded;
+        
+        navigator.clipboard.writeText(url).then(() => {
+            alert("Ссылка скопирована! Отправьте её друзьям.");
+        });
     }
 
     function parse(str) {
@@ -89,8 +118,7 @@
     }
 
     function toM(t) {
-        const [h, m] = t.split(':').map(Number);
-        return h * 60 + m;
+        const [h, m] = t.split(':').map(Number); return h * 60 + m;
     }
 
     function drawTimeline() {
@@ -99,38 +127,11 @@
         schedule.forEach(range => {
             const div = document.createElement('div');
             div.className = 'timeline-segment';
-            div.style.background = '#ff4444';
-            div.style.left = (range.start / 1440 * 100) + '%';
-            div.style.width = ((range.end - range.start) / 1440 * 100) + '%';
+            div.style.cssText = `background:#ff4444; left:${range.start/14.4}%; width:${(range.end-range.start)/14.4}%;`;
+            div.setAttribute('data-end', range.end);
             tl.appendChild(div);
         });
         tl.style.background = '#008844'; 
-    }
-
-    function updateStats(cur) {
-        if (schedule.length === 0) return;
-
-        let totalOff = 0;
-        schedule.forEach(r => totalOff += (r.end - r.start));
-        let totalLight = 1440 - totalOff;
-
-        // Поиск окон света (между отключениями)
-        let lightWindows = [];
-        let dayStart = 0;
-        schedule.forEach(off => {
-            if (off.start > dayStart) lightWindows.push({s: dayStart, e: off.start});
-            dayStart = off.end;
-        });
-        if (dayStart < 1440) lightWindows.push({s: dayStart, e: 1440});
-
-        // Считаем активные/будущие сеансы
-        let sessionsLeft = lightWindows.filter(win => win.e > cur).length;
-        let maxWin = lightWindows.length > 0 ? Math.max(...lightWindows.map(w => w.e - w.s)) : 0;
-
-        document.getElementById('stat-total').innerText = `${Math.floor(totalLight/60)}ч ${totalLight%60}м`;
-        document.getElementById('stat-max').innerText = `${Math.floor(maxWin/60)}ч ${maxWin%60}м`;
-        document.getElementById('stat-count').innerText = sessionsLeft;
-        document.getElementById('stat-used').innerText = Math.round((cur / 1440) * 100) + '%';
     }
 
     function update() {
@@ -138,49 +139,49 @@
         const cur = now.getHours() * 60 + now.getMinutes();
         const sec = now.getSeconds();
 
-        document.getElementById('now-marker').style.left = (cur / 1440 * 100) + '%';
+        document.getElementById('now-marker').style.left = (cur / 14.4) + '%';
+        document.querySelectorAll('.timeline-segment').forEach(s => {
+            if (parseInt(s.getAttribute('data-end')) <= cur) s.classList.add('past');
+        });
 
         if (!isRunning || schedule.length === 0) return;
 
         let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
-        let blockOn = document.getElementById('block-on');
-        let blockOff = document.getElementById('block-off');
+        let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
 
         if (currentOff) {
-            blockOn.style.display = 'block';
-            blockOff.style.display = 'none';
+            bOn.style.display = 'block'; bOff.style.display = 'none';
             document.getElementById('t-on').innerText = fmt(currentOff.end - cur, sec);
-            document.getElementById('main-status').innerText = "🌑 СВЕТА НЕТ";
-            document.getElementById('main-status').className = "status-off";
+            statusUI("🌑 СВЕТА НЕТ", "status-off");
         } else {
-            blockOn.style.display = 'none';
-            blockOff.style.display = 'block';
+            bOn.style.display = 'none'; bOff.style.display = 'block';
             let nextOff = schedule.find(r => r.start > cur);
-            let timeToOff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
-            document.getElementById('t-off').innerText = fmt(timeToOff, sec);
-            document.getElementById('main-status').innerText = "⚡ СВЕТ ЕСТЬ";
-            document.getElementById('main-status').className = "status-on";
+            let diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
+            document.getElementById('t-off').innerText = fmt(diff, sec);
+            statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
         }
-
-        // Обновляем статистику раз в минуту
         if (sec === 0) updateStats(cur);
     }
 
-    function fmt(m, s) {
-        const hh = Math.floor(m / 60);
-        const mm = m % 60;
-        const ss = 59 - s;
-        return `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
+    function updateStats(cur) {
+        let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
+        let windows = []; let last = 0;
+        schedule.forEach(o => { if(o.start > last) windows.push({s:last, e:o.start}); last = o.end; });
+        if(last < 1440) windows.push({s:last, e:1440});
+        
+        document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
+        document.getElementById('stat-max').innerText = Math.floor(Math.max(...windows.map(w=>w.e-w.s),0)/60) + "ч...";
+        document.getElementById('stat-count').innerText = windows.filter(w => w.e > cur).length;
+        document.getElementById('stat-used').innerText = Math.round(cur/14.4) + "%";
     }
 
-    // Автозапуск при загрузке страницы
-    window.onload = () => {
-        const saved = localStorage.getItem('saved_gr_v5');
-        if (saved) {
-            document.getElementById('input').value = saved;
-            init();
-        }
-    };
+    function statusUI(txt, cls) { 
+        const s = document.getElementById('main-status'); s.innerText = txt; s.className = cls; 
+    }
+
+    function fmt(m, s) {
+        return `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}:${(59-s).toString().padStart(2,'0')}`;
+    }
 
     setInterval(update, 1000);
 </script>
