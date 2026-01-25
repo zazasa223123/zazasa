@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Монитор Света: Admin Edition</title>
+    <title>Монитор Света PRO</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2987/2987996.png">
+    
     <style>
         body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); }
+        .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); position: relative; }
         
         #main-status { padding: 12px; border-radius: 12px; font-weight: bold; font-size: 1.3rem; margin-bottom: 15px; text-transform: uppercase; border: 2px solid transparent; }
         .status-on { background: rgba(0, 255, 136, 0.1); color: #00ff88; border-color: #00ff88; }
@@ -14,7 +19,7 @@
 
         .timeline-container { position: relative; height: 25px; background: #222; border-radius: 8px; margin: 10px 0 25px 0; overflow: hidden; border: 1px solid #333; }
         .timeline-segment { position: absolute; height: 100%; top: 0; }
-        .past { opacity: 0.3 !important; }
+        /* Эффект 'past' удален */
         #now-marker { position: absolute; width: 3px; height: 100%; background: #fff; top: 0; z-index: 10; box-shadow: 0 0 10px #fff; }
 
         .timer-block { margin: 10px 0; padding: 10px; border-radius: 12px; background: #181818; border: 1px solid #222; display: none; }
@@ -24,12 +29,8 @@
         .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .stat-item { font-size: 0.75rem; color: #888; }
         .stat-value { display: block; font-size: 1rem; color: #00ff88; font-weight: bold; }
-
-        /* Скрытая Админка */
-        #admin-panel { display: none; margin-top: 20px; padding-top: 20px; border-top: 1px dashed #444; }
-        textarea { width: 100%; background: #151515; color: #fff; border: 1px solid #0055ff; padding: 10px; border-radius: 10px; font-size: 0.8rem; resize: none; box-sizing: border-box; }
-        .admin-btn { background: #0055ff; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .admin-label { font-size: 0.7rem; color: #0055ff; text-transform: uppercase; margin-bottom: 5px; display: block; font-weight: bold; }
+        
+        #sync-label { font-size: 0.6rem; color: #444; margin-top: 10px; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -50,129 +51,4 @@
 
     <div class="stats-section">
         <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
-        <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
-        <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
-        <div class="stat-item">Осталось:<span id="stat-count" class="stat-value">--</span></div>
-    </div>
-
-    <div id="admin-panel">
-        <span class="admin-label">Панель администратора</span>
-        <textarea id="admin-input" rows="2" placeholder="09:00-12:00, 15:00-18:00"></textarea>
-        <button class="admin-btn" onclick="generateAdminLink()">📢 СОЗДАТЬ ССЫЛКУ ДЛЯ ВСЕХ</button>
-    </div>
-</div>
-
-<script>
-    const ADMIN_PASS = "1234"; // ТВОЙ ПАРОЛЬ
-    let schedule = [];
-    let isRunning = false;
-
-    window.onload = () => {
-        const params = new URLSearchParams(window.location.search);
-        
-        // 1. Проверяем вход в админку
-        if (params.get('admin') === ADMIN_PASS) {
-            document.getElementById('admin-panel').style.display = 'block';
-        }
-
-        // 2. Проверяем наличие нового графика в ссылке
-        const newSch = params.get('upd');
-        if (newSch) {
-            const decoded = atob(newSch);
-            localStorage.setItem('shared_schedule', decoded);
-            // Чистим URL от длинного кода
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-
-        // 3. Загружаем то, что сохранено
-        const currentSch = localStorage.getItem('shared_schedule') || "00:00-01:00"; // Дефолт
-        document.getElementById('admin-input').value = currentSch;
-        init(currentSch);
-    };
-
-    function generateAdminLink() {
-        const val = document.getElementById('admin-input').value;
-        if (!val) return;
-        const encoded = btoa(val);
-        const shareUrl = window.location.origin + window.location.pathname + '?upd=' + encoded;
-        
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            alert("ГОТОВО!\n\nТеперь просто скинь эту ссылку в чат. У всех, кто по ней перейдет, график обновится автоматически.");
-        });
-    }
-
-    function init(val) {
-        parse(val);
-        drawTimeline();
-        isRunning = true;
-        update();
-    }
-
-    function parse(str) {
-        schedule = [];
-        const matches = str.matchAll(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/g);
-        for (const m of matches) {
-            schedule.push({ start: toM(m[1]), end: toM(m[2] === "00:00" ? "24:00" : m[2]) });
-        }
-        schedule.sort((a,b) => a.start - b.start);
-    }
-
-    function toM(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
-
-    function drawTimeline() {
-        const tl = document.getElementById('timeline');
-        tl.querySelectorAll('.timeline-segment').forEach(s => s.remove());
-        schedule.forEach(range => {
-            const div = document.createElement('div');
-            div.className = 'timeline-segment';
-            div.style.cssText = `background:#ff4444; left:${range.start/14.4}%; width:${(range.end-range.start)/14.4}%;`;
-            div.setAttribute('data-end', range.end);
-            tl.appendChild(div);
-        });
-        tl.style.background = '#008844'; 
-    }
-
-    function update() {
-        const now = new Date();
-        const cur = now.getHours() * 60 + now.getMinutes();
-        const sec = now.getSeconds();
-        document.getElementById('now-marker').style.left = (cur / 14.4) + '%';
-        document.querySelectorAll('.timeline-segment').forEach(s => {
-            if (parseInt(s.getAttribute('data-end')) <= cur) s.classList.add('past');
-        });
-
-        if (!isRunning || schedule.length === 0) return;
-        let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
-        let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
-
-        if (currentOff) {
-            bOn.style.display = 'block'; bOff.style.display = 'none';
-            document.getElementById('t-on').innerText = fmt(currentOff.end - cur, sec);
-            statusUI("🌑 СВЕТА НЕТ", "status-off");
-        } else {
-            bOn.style.display = 'none'; bOff.style.display = 'block';
-            let nextOff = schedule.find(r => r.start > cur);
-            let diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
-            document.getElementById('t-off').innerText = fmt(diff, sec);
-            statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
-        }
-        if (sec === 0 || document.getElementById('stat-total').innerText === "--") updateStats(cur);
-    }
-
-    function updateStats(cur) {
-        let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
-        let windows = []; let last = 0;
-        schedule.forEach(o => { if(o.start > last) windows.push({s:last, e:o.start}); last = o.end; });
-        if(last < 1440) windows.push({s:last, e:1440});
-        document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
-        document.getElementById('stat-max').innerText = Math.floor(Math.max(...windows.map(w=>w.e-w.s),0)/60) + "ч...";
-        document.getElementById('stat-count').innerText = windows.filter(w => w.e > cur).length;
-        document.getElementById('stat-used').innerText = Math.round(cur/14.4) + "%";
-    }
-
-    function statusUI(txt, cls) { const s = document.getElementById('main-status'); s.innerText = txt; s.className = cls; }
-    function fmt(m, s) { return `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}:${(59-s).toString().padStart(2,'0')}`; }
-    setInterval(update, 1000);
-</script>
-</body>
-</html>
+        <div class="stat-item">Макс. окно:<span id="stat-max" class="stat
