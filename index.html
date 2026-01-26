@@ -19,12 +19,16 @@
 
         .timeline-container { position: relative; height: 25px; background: #222; border-radius: 8px; margin: 10px 0 25px 0; overflow: hidden; border: 1px solid #333; }
         .timeline-segment { position: absolute; height: 100%; top: 0; }
-        /* Эффект 'past' удален */
         #now-marker { position: absolute; width: 3px; height: 100%; background: #fff; top: 0; z-index: 10; box-shadow: 0 0 10px #fff; }
 
         .timer-block { margin: 10px 0; padding: 10px; border-radius: 12px; background: #181818; border: 1px solid #222; display: none; }
         .digits { font-size: 2.5rem; font-family: monospace; display: block; font-weight: bold; }
         .label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.5; display: block; }
+
+        /* График списком */
+        #schedule-list { margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid #222; text-align: left; }
+        .sch-title { font-size: 0.65rem; color: #666; text-transform: uppercase; margin-bottom: 8px; display: block; letter-spacing: 1px; }
+        .sch-item { display: inline-block; background: #222; color: #ff4444; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; margin: 2px; font-family: monospace; border: 1px solid #333; }
 
         .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .stat-item { font-size: 0.75rem; color: #888; }
@@ -49,21 +53,24 @@
         <span id="t-on" class="digits">00:00:00</span>
     </div>
 
+    <div id="schedule-list">
+        <span class="sch-title">Периоды отключений:</span>
+        <div id="list-content"></div>
+    </div>
+
     <div class="stats-section">
         <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
         <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
         <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
-        <div class="stat-item">Осталось:<span id="stat-count" class="stat-value">--</span></div>
+        <div class="stat-item">Осталось окон:<span id="stat-count" class="stat-value">--</span></div>
     </div>
     <div id="sync-label">Авто-синхронизация активна</div>
 </div>
 
 <script>
- // --- ТВОИ НАСТРОЙКИ ---
     const USER = "zazasa223123"; 
     const REPO = "zazasa";  
     const FILE = "data.txt";     
-    // ----------------------
 
     let schedule = [];
     let isRunning = false;
@@ -82,6 +89,7 @@
     function init(val) {
         parse(val);
         drawTimeline();
+        renderScheduleList(val);
         isRunning = true;
         update(); 
     }
@@ -93,6 +101,20 @@
             schedule.push({ start: toM(m[1]), end: toM(m[2] === "00:00" ? "24:00" : m[2]) });
         }
         schedule.sort((a,b) => a.start - b.start);
+    }
+
+    function renderScheduleList(val) {
+        const container = document.getElementById('list-content');
+        container.innerHTML = '';
+        const periods = val.split(',');
+        periods.forEach(p => {
+            if(p.trim()) {
+                const span = document.createElement('span');
+                span.className = 'sch-item';
+                span.innerText = p.trim();
+                container.appendChild(span);
+            }
+        });
     }
 
     function toM(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
@@ -135,12 +157,21 @@
 
     function updateStats(cur) {
         let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
-        let windows = []; let last = 0;
-        schedule.forEach(o => { if(o.start > last) windows.push({s:last, e:o.start}); last = o.end; });
-        if(last < 1440) windows.push({s:last, e:1440});
+        
+        // Правильный расчет окон со светом
+        let lightWindows = [];
+        let lastEnd = 0;
+        schedule.forEach(r => {
+            if (r.start > lastEnd) lightWindows.push(r.start - lastEnd);
+            lastEnd = r.end;
+        });
+        if (lastEnd < 1440) lightWindows.push(1440 - lastEnd);
+        
+        const maxWin = Math.max(...lightWindows, 0);
+
         document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
-        document.getElementById('stat-max').innerText = Math.floor(Math.max(...windows.map(w=>w.e-w.s),0)/60) + "ч...";
-        document.getElementById('stat-count').innerText = windows.filter(w => w.e > cur).length;
+        document.getElementById('stat-max').innerText = Math.floor(maxWin/60) + "ч " + (maxWin%60) + "м";
+        document.getElementById('stat-count').innerText = lightWindows.length;
         document.getElementById('stat-used').innerText = Math.round(cur/14.4) + "%";
     }
 
@@ -153,4 +184,3 @@
 </script>
 </body>
 </html>
-
