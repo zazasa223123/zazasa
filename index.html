@@ -25,7 +25,14 @@
         .digits { font-size: 2.5rem; font-family: monospace; display: block; font-weight: bold; }
         .label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.5; display: block; }
 
-        /* График списком */
+        /* Плашка Уведомлений */
+        #alert-box { margin-top: 15px; padding: 12px; background: #1a1a1a; border-radius: 15px; border: 1px solid #333; display: flex; align-items: center; gap: 12px; text-align: left; transition: 0.3s; }
+        .alert-icon { font-size: 1.2rem; }
+        .alert-text { font-size: 0.85rem; line-height: 1.2; }
+        .alert-urgent { border-color: #ff9500; background: rgba(255, 149, 0, 0.1); color: #ff9500; animation: blink 1.5s infinite; }
+
+        @keyframes blink { 50% { opacity: 0.7; } }
+
         #schedule-list { margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid #222; text-align: left; }
         .sch-title { font-size: 0.65rem; color: #666; text-transform: uppercase; margin-bottom: 8px; display: block; letter-spacing: 1px; }
         .sch-item { display: inline-block; background: #222; color: #ff4444; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; margin: 2px; font-family: monospace; border: 1px solid #333; }
@@ -33,8 +40,6 @@
         .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .stat-item { font-size: 0.75rem; color: #888; }
         .stat-value { display: block; font-size: 1rem; color: #00ff88; font-weight: bold; }
-        
-        #sync-label { font-size: 0.6rem; color: #444; margin-top: 10px; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -53,8 +58,13 @@
         <span id="t-on" class="digits">00:00:00</span>
     </div>
 
+    <div id="alert-box">
+        <div class="alert-icon">🔔</div>
+        <div class="alert-text" id="alert-msg">Анализ графика...</div>
+    </div>
+
     <div id="schedule-list">
-        <span class="sch-title">Периоды отключений:</span>
+        <span class="sch-title">График отключений:</span>
         <div id="list-content"></div>
     </div>
 
@@ -64,7 +74,6 @@
         <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
         <div class="stat-item">Осталось окон:<span id="stat-count" class="stat-value">--</span></div>
     </div>
-    <div id="sync-label">Авто-синхронизация активна</div>
 </div>
 
 <script>
@@ -106,8 +115,7 @@
     function renderScheduleList(val) {
         const container = document.getElementById('list-content');
         container.innerHTML = '';
-        const periods = val.split(',');
-        periods.forEach(p => {
+        val.split(',').forEach(p => {
             if(p.trim()) {
                 const span = document.createElement('span');
                 span.className = 'sch-item';
@@ -140,25 +148,38 @@
         if (!isRunning || schedule.length === 0) return;
         let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
         let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
+        let diff = 0;
+        let alertMsg = "";
 
         if (currentOff) {
             bOn.style.display = 'block'; bOff.style.display = 'none';
-            document.getElementById('t-on').innerText = fmt(currentOff.end - cur, sec);
+            diff = currentOff.end - cur;
+            document.getElementById('t-on').innerText = fmt(diff, sec);
             statusUI("🌑 СВЕТА НЕТ", "status-off");
+            alertMsg = `Включат через ${diff} мин.`;
         } else {
             bOn.style.display = 'none'; bOff.style.display = 'block';
             let nextOff = schedule.find(r => r.start > cur);
-            let diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
+            diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
             document.getElementById('t-off').innerText = fmt(diff, sec);
             statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
+            alertMsg = `Отключат через ${diff} мин.`;
         }
+
+        // Логика плашки уведомлений
+        const alertBox = document.getElementById('alert-box');
+        document.getElementById('alert-msg').innerText = alertMsg;
+        if (diff <= 15) {
+            alertBox.classList.add('alert-urgent');
+        } else {
+            alertBox.classList.remove('alert-urgent');
+        }
+
         if (sec === 0 || document.getElementById('stat-total').innerText === "--") updateStats(cur);
     }
 
     function updateStats(cur) {
         let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
-        
-        // Правильный расчет окон со светом
         let lightWindows = [];
         let lastEnd = 0;
         schedule.forEach(r => {
@@ -168,7 +189,6 @@
         if (lastEnd < 1440) lightWindows.push(1440 - lastEnd);
         
         const maxWin = Math.max(...lightWindows, 0);
-
         document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
         document.getElementById('stat-max').innerText = Math.floor(maxWin/60) + "ч " + (maxWin%60) + "м";
         document.getElementById('stat-count').innerText = lightWindows.length;
