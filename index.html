@@ -10,9 +10,27 @@
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2987/2987996.png">
     
     <style>
-        body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); position: relative; }
+        body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; overflow: hidden; }
+        .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); position: relative; z-index: 1; }
         
+        /* Бургер-меню */
+        .menu-btn { position: absolute; top: 20px; left: 20px; cursor: pointer; z-index: 10; padding: 5px; }
+        .menu-icon { width: 25px; height: 3px; background: #888; margin: 4px 0; border-radius: 2px; transition: 0.3s; }
+        
+        .side-menu { position: fixed; top: 0; left: -280px; width: 250px; height: 100%; background: #151515; border-right: 1px solid #333; transition: 0.4s; z-index: 100; padding: 60px 20px; text-align: left; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .side-menu.active { left: 0; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 90; }
+        .menu-overlay.active { display: block; }
+
+        h3 { font-size: 1rem; color: #00ff88; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+        .settings-item { margin-bottom: 25px; }
+        .settings-label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 10px; }
+        
+        /* Стили будильника */
+        .alarm-input { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .alarm-input:focus { border-color: #00ff88; }
+
+        /* Основной интерфейс */
         #main-status { padding: 12px; border-radius: 12px; font-weight: bold; font-size: 1.3rem; margin-bottom: 15px; text-transform: uppercase; border: 2px solid transparent; }
         .status-on { background: rgba(0, 255, 136, 0.1); color: #00ff88; border-color: #00ff88; }
         .status-off { background: rgba(255, 68, 68, 0.1); color: #ff4444; border-color: #ff4444; }
@@ -25,16 +43,12 @@
         .digits { font-size: 2.5rem; font-family: monospace; display: block; font-weight: bold; }
         .label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.5; display: block; }
 
-        /* Плашка Уведомлений */
-        #alert-box { margin-top: 15px; padding: 12px; background: #1a1a1a; border-radius: 15px; border: 1px solid #333; display: flex; align-items: center; gap: 12px; text-align: left; transition: 0.3s; }
-        .alert-icon { font-size: 1.2rem; }
-        .alert-text { font-size: 0.85rem; line-height: 1.2; }
+        #alert-box { margin-top: 15px; padding: 12px; background: #1a1a1a; border-radius: 15px; border: 1px solid #333; display: flex; align-items: center; gap: 12px; text-align: left; }
         .alert-urgent { border-color: #ff9500; background: rgba(255, 149, 0, 0.1); color: #ff9500; animation: blink 1.5s infinite; }
-
         @keyframes blink { 50% { opacity: 0.7; } }
 
         #schedule-list { margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid #222; text-align: left; }
-        .sch-title { font-size: 0.65rem; color: #666; text-transform: uppercase; margin-bottom: 8px; display: block; letter-spacing: 1px; }
+        .sch-title { font-size: 0.65rem; color: #666; text-transform: uppercase; margin-bottom: 8px; display: block; }
         .sch-item { display: inline-block; background: #222; color: #ff4444; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; margin: 2px; font-family: monospace; border: 1px solid #333; }
 
         .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -44,37 +58,56 @@
 </head>
 <body>
 
-<div class="card">
-    <div id="main-status">Загрузка...</div>
-    <div class="timeline-container" id="timeline"><div id="now-marker"></div></div>
-
-    <div id="block-off" class="timer-block" style="color: #00ff88;">
-        <span class="label">Свет будет еще:</span>
-        <span id="t-off" class="digits">00:00:00</span>
+    <div class="menu-btn" onclick="toggleMenu()">
+        <div class="menu-icon"></div>
+        <div class="menu-icon"></div>
+        <div class="menu-icon"></div>
     </div>
 
-    <div id="block-on" class="timer-block" style="color: #ff4444;">
-        <span class="label">До включения осталось:</span>
-        <span id="t-on" class="digits">00:00:00</span>
+    <div class="menu-overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <div class="side-menu" id="sideMenu">
+        <h3>Настройки</h3>
+        <div class="settings-item">
+            <span class="settings-label">Уведомление (мин до события):</span>
+            <input type="number" id="alarmTime" class="alarm-input" value="15" onchange="saveSettings()">
+        </div>
+        <div class="settings-item" style="opacity: 0.5; font-size: 0.7rem;">
+            * Будильник сработает визуально, когда останется указанное время.
+        </div>
     </div>
 
-    <div id="alert-box">
-        <div class="alert-icon">🔔</div>
-        <div class="alert-text" id="alert-msg">Анализ графика...</div>
-    </div>
+    <div class="card">
+        <div id="main-status">Загрузка...</div>
+        <div class="timeline-container" id="timeline"><div id="now-marker"></div></div>
 
-    <div id="schedule-list">
-        <span class="sch-title">График отключений:</span>
-        <div id="list-content"></div>
-    </div>
+        <div id="block-off" class="timer-block" style="color: #00ff88;">
+            <span class="label">Свет будет еще:</span>
+            <span id="t-off" class="digits">00:00:00</span>
+        </div>
 
-    <div class="stats-section">
-        <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
-        <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
-        <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
-        <div class="stat-item">Осталось окон:<span id="stat-count" class="stat-value">--</span></div>
+        <div id="block-on" class="timer-block" style="color: #ff4444;">
+            <span class="label">До включения осталось:</span>
+            <span id="t-on" class="digits">00:00:00</span>
+        </div>
+
+        <div id="alert-box">
+            <div class="alert-icon">🔔</div>
+            <div id="alert-msg" style="font-size: 0.85rem;">Синхронизация...</div>
+        </div>
+
+        <div id="schedule-list">
+            <span class="sch-title">График отключений:</span>
+            <div id="list-content"></div>
+        </div>
+
+        <div class="stats-section">
+            <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
+            <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
+            <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
+            <div class="stat-item">Окон:<span id="stat-count" class="stat-value">--</span></div>
+        </div>
     </div>
-</div>
 
 <script>
     const USER = "zazasa223123"; 
@@ -83,6 +116,18 @@
 
     let schedule = [];
     let isRunning = false;
+    let userAlarmMinutes = localStorage.getItem('alarmMins') || 15;
+
+    // Функции меню
+    function toggleMenu() {
+        document.getElementById('sideMenu').classList.toggle('active');
+        document.getElementById('overlay').classList.toggle('active');
+    }
+
+    function saveSettings() {
+        userAlarmMinutes = document.getElementById('alarmTime').value;
+        localStorage.setItem('alarmMins', userAlarmMinutes);
+    }
 
     async function loadData() {
         try {
@@ -90,15 +135,14 @@
             const response = await fetch(url);
             const text = await response.text();
             if (text) { init(text); }
-        } catch (e) {
-            document.getElementById('main-status').innerText = "Ошибка сети";
-        }
+        } catch (e) { document.getElementById('main-status').innerText = "Ошибка сети"; }
     }
 
     function init(val) {
         parse(val);
         drawTimeline();
         renderScheduleList(val);
+        document.getElementById('alarmTime').value = userAlarmMinutes;
         isRunning = true;
         update(); 
     }
@@ -149,27 +193,28 @@
         let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
         let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
         let diff = 0;
-        let alertMsg = "";
+        let actionTxt = "";
 
         if (currentOff) {
             bOn.style.display = 'block'; bOff.style.display = 'none';
             diff = currentOff.end - cur;
             document.getElementById('t-on').innerText = fmt(diff, sec);
             statusUI("🌑 СВЕТА НЕТ", "status-off");
-            alertMsg = `Включат через ${diff} мин.`;
+            actionTxt = "Включат через";
         } else {
             bOn.style.display = 'none'; bOff.style.display = 'block';
             let nextOff = schedule.find(r => r.start > cur);
             diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
             document.getElementById('t-off').innerText = fmt(diff, sec);
             statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
-            alertMsg = `Отключат через ${diff} мин.`;
+            actionTxt = "Отключат через";
         }
 
-        // Логика плашки уведомлений
+        // Уведомление
         const alertBox = document.getElementById('alert-box');
-        document.getElementById('alert-msg').innerText = alertMsg;
-        if (diff <= 15) {
+        document.getElementById('alert-msg').innerText = `${actionTxt} ${diff} мин.`;
+        
+        if (diff <= userAlarmMinutes) {
             alertBox.classList.add('alert-urgent');
         } else {
             alertBox.classList.remove('alert-urgent');
