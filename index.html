@@ -51,4 +51,105 @@
 
     <div class="stats-section">
         <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
-        <div class="stat-item">Макс. окно:<span id="stat-max" class="stat
+        <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
+        <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
+        <div class="stat-item">Осталось:<span id="stat-count" class="stat-value">--</span></div>
+    </div>
+    <div id="sync-label">Авто-синхронизация активна</div>
+</div>
+
+<script>
+    // --- ТВОИ НАСТРОЙКИ ---
+    const USER = "ТВОЙ_ЛОГИН"; 
+    const REPO = "ТВОЙ_РЕПО";  
+    const FILE = "data.txt";     
+    // ----------------------
+
+    let schedule = [];
+    let isRunning = false;
+
+    async function loadData() {
+        try {
+            const url = `https://raw.githubusercontent.com/${USER}/${REPO}/main/${FILE}?t=${Date.now()}`;
+            const response = await fetch(url);
+            const text = await response.text();
+            if (text) { init(text); }
+        } catch (e) {
+            document.getElementById('main-status').innerText = "Ошибка сети";
+        }
+    }
+
+    function init(val) {
+        parse(val);
+        drawTimeline();
+        isRunning = true;
+        update(); 
+    }
+
+    function parse(str) {
+        schedule = [];
+        const matches = str.matchAll(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/g);
+        for (const m of matches) {
+            schedule.push({ start: toM(m[1]), end: toM(m[2] === "00:00" ? "24:00" : m[2]) });
+        }
+        schedule.sort((a,b) => a.start - b.start);
+    }
+
+    function toM(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+
+    function drawTimeline() {
+        const tl = document.getElementById('timeline');
+        tl.querySelectorAll('.timeline-segment').forEach(s => s.remove());
+        schedule.forEach(range => {
+            const div = document.createElement('div');
+            div.className = 'timeline-segment';
+            div.style.cssText = `background:#ff4444; left:${range.start/14.4}%; width:${(range.end-range.start)/14.4}%;`;
+            tl.appendChild(div);
+        });
+        tl.style.background = '#008844'; 
+    }
+
+    function update() {
+        const now = new Date();
+        const cur = now.getHours() * 60 + now.getMinutes();
+        const sec = now.getSeconds();
+        document.getElementById('now-marker').style.left = (cur / 14.4) + '%';
+
+        if (!isRunning || schedule.length === 0) return;
+        let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
+        let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
+
+        if (currentOff) {
+            bOn.style.display = 'block'; bOff.style.display = 'none';
+            document.getElementById('t-on').innerText = fmt(currentOff.end - cur, sec);
+            statusUI("🌑 СВЕТА НЕТ", "status-off");
+        } else {
+            bOn.style.display = 'none'; bOff.style.display = 'block';
+            let nextOff = schedule.find(r => r.start > cur);
+            let diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
+            document.getElementById('t-off').innerText = fmt(diff, sec);
+            statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
+        }
+        if (sec === 0 || document.getElementById('stat-total').innerText === "--") updateStats(cur);
+    }
+
+    function updateStats(cur) {
+        let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
+        let windows = []; let last = 0;
+        schedule.forEach(o => { if(o.start > last) windows.push({s:last, e:o.start}); last = o.end; });
+        if(last < 1440) windows.push({s:last, e:1440});
+        document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
+        document.getElementById('stat-max').innerText = Math.floor(Math.max(...windows.map(w=>w.e-w.s),0)/60) + "ч...";
+        document.getElementById('stat-count').innerText = windows.filter(w => w.e > cur).length;
+        document.getElementById('stat-used').innerText = Math.round(cur/14.4) + "%";
+    }
+
+    function statusUI(txt, cls) { const s = document.getElementById('main-status'); s.innerText = txt; s.className = cls; }
+    function fmt(m, s) { return `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}:${(59-s).toString().padStart(2,'0')}`; }
+
+    loadData();
+    setInterval(loadData, 300000); 
+    setInterval(update, 1000);
+</script>
+</body>
+</html>
