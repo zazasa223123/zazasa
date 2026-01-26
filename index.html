@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -13,24 +14,19 @@
         body { background: #0a0a0a; color: #fff; font-family: 'Segoe UI', sans-serif; text-align: center; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; overflow: hidden; }
         .card { background: #111; border: 2px solid #333; padding: 25px; border-radius: 25px; width: 100%; max-width: 380px; box-shadow: 0 15px 50px rgba(0,0,0,0.9); position: relative; z-index: 1; }
         
-        /* Бургер-меню */
+        /* Меню */
         .menu-btn { position: absolute; top: 20px; left: 20px; cursor: pointer; z-index: 10; padding: 5px; }
         .menu-icon { width: 25px; height: 3px; background: #888; margin: 4px 0; border-radius: 2px; transition: 0.3s; }
-        
-        .side-menu { position: fixed; top: 0; left: -280px; width: 250px; height: 100%; background: #151515; border-right: 1px solid #333; transition: 0.4s; z-index: 100; padding: 60px 20px; text-align: left; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .side-menu { position: fixed; top: 0; left: -280px; width: 250px; height: 100%; background: #151515; border-right: 1px solid #333; transition: 0.4s; z-index: 100; padding: 60px 20px; text-align: left; }
         .side-menu.active { left: 0; }
         .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 90; }
         .menu-overlay.active { display: block; }
 
-        h3 { font-size: 1rem; color: #00ff88; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-        .settings-item { margin-bottom: 25px; }
+        h3 { font-size: 1rem; color: #00ff88; margin-bottom: 20px; text-transform: uppercase; }
         .settings-label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 10px; }
-        
-        /* Стили будильника */
-        .alarm-input { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px; font-size: 0.9rem; outline: none; }
-        .alarm-input:focus { border-color: #00ff88; }
+        .alarm-input { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 8px; outline: none; }
 
-        /* Основной интерфейс */
+        /* Интерфейс */
         #main-status { padding: 12px; border-radius: 12px; font-weight: bold; font-size: 1.3rem; margin-bottom: 15px; text-transform: uppercase; border: 2px solid transparent; }
         .status-on { background: rgba(0, 255, 136, 0.1); color: #00ff88; border-color: #00ff88; }
         .status-off { background: rgba(255, 68, 68, 0.1); color: #ff4444; border-color: #ff4444; }
@@ -54,58 +50,38 @@
         .stats-section { background: #1a1a1a; border-radius: 15px; padding: 10px; margin-top: 20px; text-align: left; border: 1px solid #333; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .stat-item { font-size: 0.75rem; color: #888; }
         .stat-value { display: block; font-size: 1rem; color: #00ff88; font-weight: bold; }
+        #sync-label { grid-column: span 2; font-size: 0.6rem; color: #444; text-align: center; margin-top: 5px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div class="menu-btn" onclick="toggleMenu()">
-        <div class="menu-icon"></div>
-        <div class="menu-icon"></div>
-        <div class="menu-icon"></div>
+        <div class="menu-icon"></div><div class="menu-icon"></div><div class="menu-icon"></div>
     </div>
-
     <div class="menu-overlay" id="overlay" onclick="toggleMenu()"></div>
-
     <div class="side-menu" id="sideMenu">
         <h3>Настройки</h3>
-        <div class="settings-item">
-            <span class="settings-label">Уведомление (мин до события):</span>
-            <input type="number" id="alarmTime" class="alarm-input" value="15" onchange="saveSettings()">
-        </div>
-        <div class="settings-item" style="opacity: 0.5; font-size: 0.7rem;">
-            * Будильник сработает визуально, когда останется указанное время.
-        </div>
+        <span class="settings-label">Уведомление (мин до события):</span>
+        <input type="number" id="alarmTime" class="alarm-input" value="15" onchange="saveSettings()">
     </div>
 
     <div class="card">
         <div id="main-status">Загрузка...</div>
         <div class="timeline-container" id="timeline"><div id="now-marker"></div></div>
 
-        <div id="block-off" class="timer-block" style="color: #00ff88;">
-            <span class="label">Свет будет еще:</span>
-            <span id="t-off" class="digits">00:00:00</span>
-        </div>
+        <div id="block-off" class="timer-block" style="color: #00ff88;"><span class="label">Свет будет еще:</span><span id="t-off" class="digits">00:00:00</span></div>
+        <div id="block-on" class="timer-block" style="color: #ff4444;"><span class="label">До включения:</span><span id="t-on" class="digits">00:00:00</span></div>
 
-        <div id="block-on" class="timer-block" style="color: #ff4444;">
-            <span class="label">До включения осталось:</span>
-            <span id="t-on" class="digits">00:00:00</span>
-        </div>
+        <div id="alert-box"><div class="alert-icon">🔔</div><div id="alert-msg" style="font-size: 0.85rem;">Поиск данных...</div></div>
 
-        <div id="alert-box">
-            <div class="alert-icon">🔔</div>
-            <div id="alert-msg" style="font-size: 0.85rem;">Синхронизация...</div>
-        </div>
-
-        <div id="schedule-list">
-            <span class="sch-title">График отключений:</span>
-            <div id="list-content"></div>
-        </div>
+        <div id="schedule-list"><span class="sch-title">График отключений:</span><div id="list-content"></div></div>
 
         <div class="stats-section">
             <div class="stat-item">Свет/сутки:<span id="stat-total" class="stat-value">--</span></div>
             <div class="stat-item">Макс. окно:<span id="stat-max" class="stat-value">--</span></div>
             <div class="stat-item">Прогресс:<span id="stat-used" class="stat-value">--</span></div>
             <div class="stat-item">Окон:<span id="stat-count" class="stat-value">--</span></div>
+            <div id="sync-label">Синхронизация...</div>
         </div>
     </div>
 
@@ -118,24 +94,29 @@
     let isRunning = false;
     let userAlarmMinutes = localStorage.getItem('alarmMins') || 15;
 
-    // Функции меню
-    function toggleMenu() {
-        document.getElementById('sideMenu').classList.toggle('active');
-        document.getElementById('overlay').classList.toggle('active');
-    }
-
-    function saveSettings() {
-        userAlarmMinutes = document.getElementById('alarmTime').value;
-        localStorage.setItem('alarmMins', userAlarmMinutes);
-    }
+    function toggleMenu() { document.getElementById('sideMenu').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+    function saveSettings() { userAlarmMinutes = document.getElementById('alarmTime').value; localStorage.setItem('alarmMins', userAlarmMinutes); }
 
     async function loadData() {
+        const syncLabel = document.getElementById('sync-label');
         try {
             const url = `https://raw.githubusercontent.com/${USER}/${REPO}/main/${FILE}?t=${Date.now()}`;
             const response = await fetch(url);
+            if (!response.ok) throw new Error("Offline");
+            
             const text = await response.text();
-            if (text) { init(text); }
-        } catch (e) { document.getElementById('main-status').innerText = "Ошибка сети"; }
+            localStorage.setItem('cached_schedule', text);
+            syncLabel.innerText = "Обновлено только что";
+            init(text);
+        } catch (e) {
+            const cachedText = localStorage.getItem('cached_schedule');
+            if (cachedText) {
+                syncLabel.innerText = "Оффлайн режим (кэш)";
+                init(cachedText);
+            } else {
+                document.getElementById('main-status').innerText = "Нужен интернет";
+            }
+        }
     }
 
     function init(val) {
@@ -192,55 +173,43 @@
         if (!isRunning || schedule.length === 0) return;
         let currentOff = schedule.find(r => cur >= r.start && cur < r.end);
         let bOn = document.getElementById('block-on'), bOff = document.getElementById('block-off');
-        let diff = 0;
-        let actionTxt = "";
+        let diff = 0; let act = "";
 
         if (currentOff) {
             bOn.style.display = 'block'; bOff.style.display = 'none';
             diff = currentOff.end - cur;
             document.getElementById('t-on').innerText = fmt(diff, sec);
             statusUI("🌑 СВЕТА НЕТ", "status-off");
-            actionTxt = "Включат через";
+            act = "Включат через";
         } else {
             bOn.style.display = 'none'; bOff.style.display = 'block';
             let nextOff = schedule.find(r => r.start > cur);
             diff = nextOff ? (nextOff.start - cur) : (schedule[0].start + 1440 - cur);
             document.getElementById('t-off').innerText = fmt(diff, sec);
             statusUI("⚡ СВЕТ ЕСТЬ", "status-on");
-            actionTxt = "Отключат через";
+            act = "Отключат через";
         }
 
-        // Уведомление
-        const alertBox = document.getElementById('alert-box');
-        document.getElementById('alert-msg').innerText = `${actionTxt} ${diff} мин.`;
-        
-        if (diff <= userAlarmMinutes) {
-            alertBox.classList.add('alert-urgent');
-        } else {
-            alertBox.classList.remove('alert-urgent');
-        }
+        document.getElementById('alert-msg').innerText = `${act} ${diff} мин.`;
+        const ab = document.getElementById('alert-box');
+        if (diff <= userAlarmMinutes) ab.classList.add('alert-urgent'); else ab.classList.remove('alert-urgent');
 
         if (sec === 0 || document.getElementById('stat-total').innerText === "--") updateStats(cur);
     }
 
     function updateStats(cur) {
         let offMin = 0; schedule.forEach(r => offMin += (r.end - r.start));
-        let lightWindows = [];
-        let lastEnd = 0;
-        schedule.forEach(r => {
-            if (r.start > lastEnd) lightWindows.push(r.start - lastEnd);
-            lastEnd = r.end;
-        });
-        if (lastEnd < 1440) lightWindows.push(1440 - lastEnd);
-        
-        const maxWin = Math.max(...lightWindows, 0);
+        let lightWin = []; let last = 0;
+        schedule.forEach(r => { if (r.start > last) lightWin.push(r.start - last); last = r.end; });
+        if (last < 1440) lightWin.push(1440 - last);
+        const max = Math.max(...lightWin, 0);
         document.getElementById('stat-total').innerText = Math.floor((1440-offMin)/60) + "ч " + (1440-offMin)%60 + "м";
-        document.getElementById('stat-max').innerText = Math.floor(maxWin/60) + "ч " + (maxWin%60) + "м";
-        document.getElementById('stat-count').innerText = lightWindows.length;
+        document.getElementById('stat-max').innerText = Math.floor(max/60) + "ч " + (max%60) + "м";
+        document.getElementById('stat-count').innerText = lightWin.length;
         document.getElementById('stat-used').innerText = Math.round(cur/14.4) + "%";
     }
 
-    function statusUI(txt, cls) { const s = document.getElementById('main-status'); s.innerText = txt; s.className = cls; }
+    function statusUI(t, c) { const s = document.getElementById('main-status'); s.innerText = t; s.className = c; }
     function fmt(m, s) { return `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}:${(59-s).toString().padStart(2,'0')}`; }
 
     loadData();
